@@ -12,13 +12,13 @@ cse_c = Classroom("CSE_C")
 
 G = nx.Graph()
 
-cse_a_slots = [ClassSlots(cse_a, ind) for ind in range(1, 4)]
-cse_b_slots = [ClassSlots(cse_b, ind) for ind in range(1, 4)]
-cse_c_slots = [ClassSlots(cse_c, ind) for ind in range(1, 4)]
+# Create class slots for each classroom
+class_slots = { cse_a : [ClassSlots(cse_a, ind) for ind in range(1, 4)], 
+                cse_b : [ClassSlots(cse_b, ind) for ind in range(1, 4)], 
+                cse_c : [ClassSlots(cse_c, ind) for ind in range(1, 4)] }
 
-G.add_nodes_from(cse_a_slots)
-G.add_nodes_from(cse_b_slots)
-G.add_nodes_from(cse_c_slots)
+for clasroom in class_slots.keys():
+    G.add_nodes_from(class_slots[clasroom])
 
 daa = Course("DAA", "CS101", 2)
 coa = Course("COA", "CS102", 1)
@@ -44,14 +44,11 @@ for class_slot in G.nodes():
             faculty.assigned_classes[class_slot.classroom][1] -= 1 # Decrease the course hours of the faculty for that course
             for classroom in faculty.assigned_classes.keys(): # Where all that faculty is assigned
                 if classroom.class_name != class_slot.classroom.class_name:
-                    G.add_edge(class_slot, cse_b_slots[class_slot.timeslot-1])
+                    G.add_edge(class_slot, class_slots[classroom][class_slot.timeslot-1])
             break
-        else:
-            pass
 
-print("CSE A Slots: ", [slot.faculty.name if slot != "free" else "free" for slot in cse_a_slots])
-print("CSE B Slots: ", [slot.faculty.name if slot.faculty is not None else "free" for slot in cse_b_slots])
-print("CSE C Slots: ", [slot.faculty.name if slot != "free" else "free" for slot in cse_c_slots])
+for classroom in class_slots.keys():
+    print(f"{str(classroom)} Slots : {[slot.faculty.name if slot.faculty else 'free' for slot in class_slots[classroom]]}")
 
 pos = nx.spring_layout(G, seed=20, k=1.5)  # positions for all nodes
 nx.draw(
