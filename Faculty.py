@@ -8,7 +8,9 @@ class Faculty:
         """ Assigns classrooms to the faculty member and updates the classroom's assigned faculty.
         Args:
             classrooms (dict): A dictionary mapping classrooms to courses (Classroom object : Course Object).
+            ["CSE_A object": [course object, course hours]]
         """
+        classrooms = {classroom: [course, course.course_hours] for classroom, course in classrooms.items()}
         self.assigned_classes.update(classrooms)
         for classroom, course in classrooms.items():
             classroom.add_faculty(self, course)
