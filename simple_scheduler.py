@@ -20,7 +20,7 @@ class_slots = { cse_a : [ClassSlots(cse_a, ind) for ind in range(1, 4)],
 for clasroom in class_slots.keys():
     G.add_nodes_from(class_slots[clasroom])
 
-daa = Course("DAA", "CS101", 2)
+daa = Course("DAA", "CS101", 4)
 coa = Course("COA", "CS102", 1)
 pfl = Course("PFL", "CS103", 1)
 
@@ -35,11 +35,44 @@ delia.add_classes(classrooms={cse_c: daa})
 oak = Faculty("Oak")
 oak.add_classes(classrooms={cse_c: coa})
 
+faculties = [ramu, ash, brock, delia, oak]
+
+def is_valid_slot_for_faculty(faculty, class_slot):
+    """
+    Checks if a faculty member can be assigned to a given class slot.
+
+    Args:
+        faculty (Faculty): The faculty member to check.
+        class_slot (ClassSlots): The class slot to check against.
+
+    Returns:
+        bool: True if the faculty member can be assigned, False otherwise.
+
+    Notes:
+        This function checks four conditions to determine validity:
+
+            1. The course is still scheduled for the given classroom.
+            2. The faculty member is not already teaching another course at this time slot.
+            3. The previous class in the same room was taught by a different faculty member.
+            4. The faculty member has at most one class assigned to them in this time slot.
+
+    """
+    course_hours = faculty.assigned_classes[class_slot.classroom][1] > 0
+    faculty_not_going_other_class = faculty.name not in [key.faculty.name for key in G.neighbors(class_slot)]
+    prev_faculty = class_slots[class_slot.classroom][class_slot.timeslot - 2].faculty
+    last_class_different_faculty = prev_faculty.name != faculty.name if prev_faculty else True
+    
+    count = 1
+    for slot in class_slots[class_slot.classroom]:
+        if slot.faculty == faculty:
+            count += 1
+
+    return course_hours and faculty_not_going_other_class and last_class_different_faculty and count <= 1
+
 for class_slot in G.nodes():
     for faculty in class_slot.classroom.assigned_faculty.keys(): # For all faculty assigned to the classroom
-        course_hours = faculty.assigned_classes[class_slot.classroom][1] > 0
         # If the faculty is not already assigned to the class slot and has course hours left
-        if course_hours and faculty.name not in [key.faculty.name for key in G.neighbors(class_slot)]: 
+        if is_valid_slot_for_faculty(faculty, class_slot): 
             class_slot.allocate(faculty) # Allocate the class slot to the faculty
             faculty.assigned_classes[class_slot.classroom][1] -= 1 # Decrease the course hours of the faculty for that course
             for classroom in faculty.assigned_classes.keys(): # Where all that faculty is assigned
