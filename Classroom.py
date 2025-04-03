@@ -6,7 +6,7 @@ class Classroom:
     def __init__(self, class_name):
         self.class_name = class_name
         self.assigned_faculty = {}
-        self.class_slots = ["free"] * 3
+        self.class_slots = ["free"] * 7
     
     def add_faculty(self, faculty, course):
         """ Assigns a faculty member to a course in the classroom.

@@ -13,16 +13,18 @@ cse_c = Classroom("CSE_C")
 G = nx.Graph()
 
 # Create class slots for each classroom
-class_slots = { cse_a : [ClassSlots(cse_a, ind) for ind in range(1, 4)], 
-                cse_b : [ClassSlots(cse_b, ind) for ind in range(1, 4)], 
-                cse_c : [ClassSlots(cse_c, ind) for ind in range(1, 4)] }
+class_slots = { cse_a : [ClassSlots(cse_a, ind) for ind in range(1, 8)], 
+                cse_b : [ClassSlots(cse_b, ind) for ind in range(1, 8)], 
+                cse_c : [ClassSlots(cse_c, ind) for ind in range(1, 8)] }
 
 for clasroom in class_slots.keys():
     G.add_nodes_from(class_slots[clasroom])
 
-daa = Course("DAA", "CSE101", 3)
-pfl = Course("PFL", "CSE103", 2)
-eee = Course("EEE", "EEE104", 1)
+daa = Course("DAA", "CSE101", 4)
+pfl = Course("PFL", "CSE102", 4)
+eee = Course("EEE", "EEE104", 3)
+os = Course("OS", "CSE104", 4)
+maths = Course("PRP", "MAT101", 3)
 
 ramu = Faculty("Ramu")
 ramu.add_classes(classrooms={cse_a : pfl, cse_b: pfl})
@@ -36,8 +38,22 @@ oak = Faculty("Oak")
 oak.add_classes(classrooms={cse_c: daa})
 harry = Faculty("Harry")
 harry.add_classes(classrooms={cse_a: eee, cse_b: eee, cse_c: eee})
+iris = Faculty("Iris")
+iris.add_classes(classrooms={cse_a : os, cse_b : os})
+blaine = Faculty("Blaine")
+blaine.add_classes(classrooms={cse_c: os})
+misty = Faculty("Misty")
+misty.add_classes(classrooms={cse_a : maths})
+max = Faculty("Max")
+max.add_classes(classrooms={cse_b : maths})
+tierno = Faculty("Tierno")
+tierno.add_classes(classrooms={cse_c : maths}) 
 
-faculties = [ramu, ash, brock, delia, oak, harry]
+courses = [daa, pfl, eee, os, maths]
+
+faculties = [ramu, ash, brock, delia, oak, harry, iris, blaine, misty, max, tierno]
+
+faculty_schedule = {faculty: {classroom: [] for classroom in faculty.assigned_classes.keys()} for faculty in faculties}  # Tracks classes assigned per day
 
 def is_valid_slot_for_faculty(faculty, class_slot):
     """
@@ -61,15 +77,15 @@ def is_valid_slot_for_faculty(faculty, class_slot):
     """
     course_hours = faculty.assigned_classes[class_slot.classroom][1] > 0
     faculty_not_going_other_class = faculty.name not in [key.faculty.name for key in G.neighbors(class_slot)]
-    prev_faculty = class_slots[class_slot.classroom][class_slot.timeslot - 2].faculty
-    last_class_different_faculty = prev_faculty.name != faculty.name if prev_faculty else True
+    count_today = faculty_schedule[faculty][class_slot.classroom].count(day)
+    had_two_classes_before = any(faculty_schedule[faculty][class_slot.classroom].count(i) > 1 for i in range(1, day))
+    if count_today == 2:
+        return False  # Already assigned two classes today
+    if count_today == 1 and had_two_classes_before: #any(faculty_schedule[faculty].count(d) == 2 for d in range(1, day)):
+        return False  # Had two classes on a previous day
     
-    count = 1
-    for slot in class_slots[class_slot.classroom]:
-        if slot.faculty == faculty:
-            count += 1
+    return course_hours and faculty_not_going_other_class
 
-    return course_hours and faculty_not_going_other_class and last_class_different_faculty and count <= 2
 
 def is_hours_remaining():
     """ Check if there are any hours remaining for any faculty member in the entire schedule."""
@@ -88,6 +104,7 @@ while is_hours_remaining():
             if is_valid_slot_for_faculty(faculty, class_slot): 
                 class_slot.allocate(faculty) # Allocate the class slot to the faculty
                 faculty.assigned_classes[class_slot.classroom][1] -= 1 # Decrease the course hours of the faculty for that course
+                faculty_schedule[faculty][class_slot.classroom].append(day)
                 for classroom in faculty.assigned_classes.keys(): # Where all that faculty is assigned
                     if classroom.class_name != class_slot.classroom.class_name:
                         G.add_edge(class_slot, class_slots[classroom][class_slot.timeslot-1])
@@ -97,9 +114,9 @@ while is_hours_remaining():
         print(f"{str(classroom)} Slots : {[slot.faculty.name if slot.faculty else 'free' for slot in class_slots[classroom]]}")
 
     G = nx.Graph()
-    class_slots = { cse_a : [ClassSlots(cse_a, ind) for ind in range(1, 4)], 
-                cse_b : [ClassSlots(cse_b, ind) for ind in range(1, 4)], 
-                cse_c : [ClassSlots(cse_c, ind) for ind in range(1, 4)] }
+    class_slots = { cse_a : [ClassSlots(cse_a, ind) for ind in range(1, 8)], 
+                cse_b : [ClassSlots(cse_b, ind) for ind in range(1, 8)], 
+                cse_c : [ClassSlots(cse_c, ind) for ind in range(1, 8)] }
     for clasroom in class_slots.keys():
         G.add_nodes_from(class_slots[clasroom])
     day += 1
@@ -115,4 +132,4 @@ nx.draw(
     font_color="#ffffff",
     width=2,
 )
-plt.show()
+# plt.show()
