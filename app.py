@@ -69,7 +69,6 @@ class SchedulerApp:
         # Buttons
         ttk.Button(self.button_frame, text="Generate Schedule", command=self.generate_schedule).grid(row=0, column=0, padx=5, pady=5)
         ttk.Button(self.button_frame, text="Save as PDF", command=self.save_pdf).grid(row=0, column=1, padx=5, pady=5)
-        ttk.Button(self.button_frame, text="Show Graph", command=self.show_graph).grid(row=0, column=2, padx=5, pady=5)
         ttk.Button(self.button_frame, text="Clear Data", command=self.clear_data).grid(row=0, column=3, padx=5, pady=5)
         ttk.Button(self.button_frame, text="Exit", command=root.quit).grid(row=0, column=4, padx=5, pady=5)
 
@@ -159,7 +158,7 @@ class SchedulerApp:
             return
         
         self.G = nx.Graph()
-        self.class_slots = {room: [ClassSlots(room, ind) for ind in range(1, 4)] for room in self.classrooms}
+        self.class_slots = {room: [ClassSlots(room, ind) for ind in range(1, 8)] for room in self.classrooms}
         for classroom in self.class_slots.keys():
             self.G.add_nodes_from(self.class_slots[classroom])
 
@@ -185,7 +184,7 @@ class SchedulerApp:
             
             # Reset for next day
             self.G = nx.Graph()
-            self.class_slots = {room: [ClassSlots(room, ind) for ind in range(1, 4)] for room in self.classrooms}
+            self.class_slots = {room: [ClassSlots(room, ind) for ind in range(1, 8)] for room in self.classrooms}
             for classroom in self.class_slots.keys():
                 self.G.add_nodes_from(self.class_slots[classroom])
             day += 1
