@@ -21,7 +21,8 @@ class SchedulerApp:
         root.iconphoto(False, tk.PhotoImage(file="SchedulitLogo.png"))
 
         # Make the window full-screen
-        self.root.state('zoomed')  
+        self.root.geometry("1920x1080")
+        self.root.attributes('-fullscreen', True)
 
         # Configure window layout
         self.root.grid_rowconfigure(0, weight=1)
