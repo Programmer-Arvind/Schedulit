@@ -16,75 +16,76 @@ class SchedulerApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Class Scheduler")
-        
-        root.iconphoto(False, tk.PhotoImage(file="SchedulitLogo.png"))
-        # Make the window full-screen
-        self.root.state('zoomed')  # Maximizes window on Windows
-        
-        # Center the content dynamically
-        self.root.grid_rowconfigure(0, weight=1)  # Allow row 0 to expand
-        self.root.grid_columnconfigure(0, weight=1)  # Allow column 0 to expand
 
-        # Main container frame to center content
+        # Set the window icon
+        root.iconphoto(False, tk.PhotoImage(file="SchedulitLogo.png"))
+
+        # Make the window full-screen
+        self.root.state('zoomed')  
+
+        # Configure window layout
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_columnconfigure(0, weight=1)
+
+        # Configure a style for consistent theming
+        style = ttk.Style()
+        style.configure("TLabel", font=("Perpetua", 16), background="#87CEEB")
+        style.configure("TButton", font=("Candara", 12))
+        style.configure("TCombobox", font=("Candara", 12))
+        style.configure("TFrame", background="#87CEEB")
+
+        # Main container frame
         self.main_frame = ttk.Frame(self.root)
         self.main_frame.grid(row=0, column=0, sticky="nsew")
-        
-        # Configure main_frame to center its contents
         self.main_frame.grid_rowconfigure(0, weight=1)
         self.main_frame.grid_rowconfigure(1, weight=1)
         self.main_frame.grid_rowconfigure(2, weight=1)
         self.main_frame.grid_columnconfigure(0, weight=1)
 
-        # Data storage (in-memory for current session)
-        self.classrooms = []
-        self.courses = []
-        self.faculties = []
-        self.class_slots = {}
-        self.faculty_schedule = {}
-        self.timetable_data = []
-
-        # Initialize database
-        self.init_db()
-
-        # Frames (inside main_frame instead of root)
+        # **Title Label at the Top**
+        self.title_label = ttk.Label(
+            self.main_frame, 
+            text="Schedulit", 
+            font=("Perpetua", 28, "bold"),
+            background="#87CEEB"
+        )
+        self.title_label.grid(row=0, column=0, pady=20, sticky="n")
+        
+        # Frames
         self.input_frame = ttk.Frame(self.main_frame, padding="10")
-        self.input_frame.grid(row=0, column=0, sticky="nsew")
+        self.input_frame.grid(row=1, column=0, sticky="nsew")
         self.button_frame = ttk.Frame(self.main_frame, padding="10")
-        self.button_frame.grid(row=1, column=0, sticky="nsew")
+        self.button_frame.grid(row=2, column=0, sticky="nsew")
         self.output_frame = ttk.Frame(self.main_frame, padding="10")
-        self.output_frame.grid(row=2, column=0, sticky="nsew")
+        self.output_frame.grid(row=3, column=0, sticky="nsew")
 
-        # Center input fields by creating a sub-frame
+        # Center input fields in a sub-frame
         self.input_subframe = ttk.Frame(self.input_frame)
-        self.input_subframe.grid(row=0, column=0, sticky="n")  # Center vertically, not stretching
-        self.input_frame.grid_columnconfigure(0, weight=1)  # Center the subframe horizontally
-
-        # Input Fields (inside input_subframe)
-        # Classroom Row
+        self.input_subframe.grid(row=0, column=0, sticky="n")
+        self.input_frame.grid_columnconfigure(0, weight=1)
+        
+        # Input Fields
         ttk.Label(self.input_subframe, text="Classroom:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        self.classroom_entry = ttk.Entry(self.input_subframe, width=30)
+        self.classroom_entry = ttk.Entry(self.input_subframe, width=30, font=("Candara", 12))
         self.classroom_entry.grid(row=0, column=1, sticky="ew", padx=5, pady=5)
         ttk.Button(self.input_subframe, text="Add Classroom", command=self.add_classroom).grid(row=0, column=2, padx=5, pady=5)
 
-        # Course Row
         ttk.Label(self.input_subframe, text="Course Name:").grid(row=1, column=0, sticky="w", padx=5, pady=5)
-        self.course_name_entry = ttk.Entry(self.input_subframe, width=30)
+        self.course_name_entry = ttk.Entry(self.input_subframe, width=30, font=("Candara", 12))
         self.course_name_entry.grid(row=1, column=1, sticky="ew", padx=5, pady=5)
         ttk.Label(self.input_subframe, text="Code:").grid(row=1, column=2, sticky="w", padx=5, pady=5)
-        self.course_code_entry = ttk.Entry(self.input_subframe, width=10)
+        self.course_code_entry = ttk.Entry(self.input_subframe, width=10, font=("Candara", 12))
         self.course_code_entry.grid(row=1, column=3, sticky="ew", padx=5, pady=5)
         ttk.Label(self.input_subframe, text="Hours:").grid(row=1, column=4, sticky="w", padx=5, pady=5)
-        self.course_hours_entry = ttk.Entry(self.input_subframe, width=5)
+        self.course_hours_entry = ttk.Entry(self.input_subframe, width=5, font=("Candara", 12))
         self.course_hours_entry.grid(row=1, column=5, sticky="ew", padx=5, pady=5)
         ttk.Button(self.input_subframe, text="Add Course", command=self.add_course).grid(row=1, column=6, padx=5, pady=5)
 
-        # Faculty Row
         ttk.Label(self.input_subframe, text="Faculty:").grid(row=2, column=0, sticky="w", padx=5, pady=5)
-        self.faculty_entry = ttk.Entry(self.input_subframe, width=30)
+        self.faculty_entry = ttk.Entry(self.input_subframe, width=30, font=("Candara", 12))
         self.faculty_entry.grid(row=2, column=1, sticky="ew", padx=5, pady=5)
         ttk.Button(self.input_subframe, text="Add Faculty", command=self.add_faculty).grid(row=2, column=2, padx=5, pady=5)
 
-        # Assignment Row
         ttk.Label(self.input_subframe, text="Assign Faculty:").grid(row=3, column=0, sticky="w", padx=5, pady=5)
         self.assign_faculty_combo = ttk.Combobox(self.input_subframe, state="readonly", width=27)
         self.assign_faculty_combo.grid(row=3, column=1, sticky="ew", padx=5, pady=5)
@@ -96,14 +97,14 @@ class SchedulerApp:
         self.assign_course_combo.grid(row=3, column=5, sticky="ew", padx=5, pady=5)
         ttk.Button(self.input_subframe, text="Assign", command=self.assign_faculty).grid(row=3, column=6, padx=5, pady=5)
 
-        # Buttons (center them in button_frame)
-        self.button_frame.grid_columnconfigure(0, weight=1)  # Center buttons horizontally
+        # Buttons
+        self.button_frame.grid_columnconfigure(0, weight=1)
         ttk.Button(self.button_frame, text="Generate Timetable", command=self.generate_timetable).grid(row=0, column=0, padx=5, pady=5)
         ttk.Button(self.button_frame, text="Save as PDF", command=self.save_pdf).grid(row=2, column=0, padx=5, pady=5)
         ttk.Button(self.button_frame, text="Clear Database", command=self.clear_database).grid(row=1, column=0, padx=5, pady=5)
 
-        # Output Text   
-        self.output_text = tk.Text(self.output_frame, height=20, width=90)
+        # Output Text
+        self.output_text = tk.Text(self.output_frame, height=20, width=90, font=("Candara", 14), bg="#F0F4F8", fg="#333333")
         self.output_text.grid(row=0, column=0, sticky="nsew")
         self.output_frame.grid_rowconfigure(0, weight=1)
         self.output_frame.grid_columnconfigure(0, weight=1)
@@ -282,7 +283,7 @@ class SchedulerApp:
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Candara-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 8),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
             ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
