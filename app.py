@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import sqlite3
 import networkx as nx
-from reportlab.lib.pagesizes import letter
+from reportlab.lib.pagesizes import A3, landscape
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 from reportlab.lib import colors
 from ClassSlots import ClassSlots
@@ -268,29 +268,74 @@ class SchedulerApp:
         if not self.timetable_data:
             messagebox.showwarning("No Data", "Please generate the timetable first!")
             return
+
         pdf_file = "timetable.pdf"
-        doc = SimpleDocTemplate(pdf_file, pagesize=letter)
+        doc = SimpleDocTemplate(pdf_file, pagesize=landscape(A3))  # Bigger Page Size
         elements = []
-        header = ["Day"] + [c.class_name for c in self.classrooms]
-        table_data = [header]
-        for day_data in self.timetable_data:
-            day = day_data[0]
-            slots = [day]
-            for entry in day_data[1:]:
-                slots.append(entry.split(": ")[1])
-            table_data.append(slots)
-        t = Table(table_data)
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ]))
-        elements.append(t)
+        
+        slot_headers = ["Day", "1", "2", "Break", "3", "4", "Break", "5", "6", "7"]
+        
+        col_widths = [50, 135, 135, 50, 135, 135, 50, 135, 135, 135]  # Narrower Break Columns
+
+        for class_index, class_name in enumerate(["CSEA", "CSEB", "CSEC"]):
+            # Add class title
+            elements.append(Table([[class_name]], colWidths=[sum(col_widths)], style=[
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 16),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ]))
+
+            table_data = [slot_headers]
+            merge_styles = []  # Store merging information
+
+            for row_idx, day_entry in enumerate(self.timetable_data):
+                day = day_entry[0]
+                schedule = day_entry[class_index + 1].split(": ")[1].split(", ")
+
+                # Insert "Break" slots
+                formatted_schedule = schedule[:2] + ["Break"] + schedule[2:4] + ["Break"] + schedule[4:]
+
+                while len(formatted_schedule) < 9:
+                    formatted_schedule.append("")
+
+                row = [day] + formatted_schedule
+                table_data.append(row)
+
+                # Handle merging
+                col_start = 1  # Skip "Day" column
+                while col_start < len(row):
+                    col_end = col_start
+                    while col_end + 1 < len(row) and row[col_end] == row[col_end + 1] and "Break" not in row[col_start]:  
+                        col_end += 1  # Extend merge range
+
+                    if col_end > col_start:  # If merge needed
+                        merge_styles.append(('SPAN', (col_start, row_idx + 1), (col_end, row_idx + 1)))
+                        merge_styles.append(('ALIGN', (col_start, row_idx + 1), (col_end, row_idx + 1), 'CENTER'))
+                        merge_styles.append(('VALIGN', (col_start, row_idx + 1), (col_end, row_idx + 1), 'MIDDLE'))
+                        for i in range(col_start + 1, col_end + 1):
+                            row[i] = ""  # Remove redundant text in merged cells
+                    
+                    col_start = col_end + 1  # Move to next unmerged cell
+
+            # Create Table
+            t = Table(table_data, colWidths=col_widths)  
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 12),  # Bigger Font
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 14),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),  # Default grid
+            ] + merge_styles + [
+                ('BOX', (0, 0), (-1, -1), 1, colors.black),  # Ensure outer border
+            ]))  
+
+            elements.append(t)
+            elements.append(Table([[""]], colWidths=[sum(col_widths)]))  # Spacer
+
         doc.build(elements)
         self.output_text.insert(tk.END, f"Timetable saved as {pdf_file}\n")
 
