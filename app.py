@@ -1,14 +1,15 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
+import sqlite3
 import networkx as nx
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 from reportlab.lib import colors
-import matplotlib.pyplot as plt
 from ClassSlots import ClassSlots
 from Faculty import Faculty
 from Classroom import Classroom
 from Course import Course
+from simple_scheduler import generate_timetable
 
 # GUI Application
 class SchedulerApp:
@@ -17,13 +18,16 @@ class SchedulerApp:
         self.root.title("Class Scheduler")
         self.root.geometry("800x600")
 
-        # Data storage
+        # Data storage (in-memory for current session)
         self.classrooms = []
         self.courses = []
         self.faculties = []
         self.class_slots = {}
-        self.G = nx.Graph()
+        self.faculty_schedule = {}
         self.timetable_data = []
+
+        # Initialize database
+        self.init_db()
 
         # Frames
         self.input_frame = ttk.Frame(root, padding="10")
@@ -56,21 +60,21 @@ class SchedulerApp:
         ttk.Button(self.input_frame, text="Add Faculty", command=self.add_faculty).grid(row=2, column=2, padx=5)
 
         ttk.Label(self.input_frame, text="Assign Faculty:").grid(row=3, column=0, sticky="w")
-        self.assign_faculty_entry = ttk.Entry(self.input_frame)
-        self.assign_faculty_entry.grid(row=3, column=1, sticky="ew")
+        self.assign_faculty_combo = ttk.Combobox(self.input_frame, state="readonly")
+        self.assign_faculty_combo.grid(row=3, column=1, sticky="ew")
         ttk.Label(self.input_frame, text="Classroom:").grid(row=3, column=2, sticky="w")
-        self.assign_classroom_entry = ttk.Entry(self.input_frame)
-        self.assign_classroom_entry.grid(row=3, column=3, sticky="ew")
+        self.assign_classroom_combo = ttk.Combobox(self.input_frame, state="readonly")
+        self.assign_classroom_combo.grid(row=3, column=3, sticky="ew")
         ttk.Label(self.input_frame, text="Course Code:").grid(row=3, column=4, sticky="w")
-        self.assign_course_entry = ttk.Entry(self.input_frame)
-        self.assign_course_entry.grid(row=3, column=5, sticky="ew")
+        self.assign_course_combo = ttk.Combobox(self.input_frame, state="readonly")
+        self.assign_course_combo.grid(row=3, column=5, sticky="ew")
         ttk.Button(self.input_frame, text="Assign", command=self.assign_faculty).grid(row=3, column=6, padx=5)
 
         # Buttons
-        ttk.Button(self.button_frame, text="Generate Schedule", command=self.generate_schedule).grid(row=0, column=0, padx=5, pady=5)
+        ttk.Button(self.button_frame, text="Generate Timetable", command=self.generate_timetable).grid(row=0, column=0, padx=5, pady=5)
         ttk.Button(self.button_frame, text="Save as PDF", command=self.save_pdf).grid(row=0, column=1, padx=5, pady=5)
-        ttk.Button(self.button_frame, text="Clear Data", command=self.clear_data).grid(row=0, column=3, padx=5, pady=5)
-        ttk.Button(self.button_frame, text="Exit", command=root.quit).grid(row=0, column=4, padx=5, pady=5)
+        ttk.Button(self.button_frame, text="Clear Database", command=self.clear_database).grid(row=0, column=2, padx=5, pady=5)
+        ttk.Button(self.button_frame, text="Exit", command=root.quit).grid(row=0, column=3, padx=5, pady=5)
 
         # Output Text
         self.output_text = tk.Text(self.output_frame, height=20, width=90)
@@ -78,11 +82,63 @@ class SchedulerApp:
         self.output_frame.grid_rowconfigure(0, weight=1)
         self.output_frame.grid_columnconfigure(0, weight=1)
 
+        # Load initial data from database
+        self.load_data()
+
+    def init_db(self):
+        conn = sqlite3.connect('scheduler.db')
+        c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS classrooms (class_name TEXT PRIMARY KEY)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS courses (code TEXT PRIMARY KEY, name TEXT, hours INTEGER)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS faculty (name TEXT PRIMARY KEY)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS assignments (faculty_name TEXT, class_name TEXT, course_code TEXT, 
+                    FOREIGN KEY(faculty_name) REFERENCES faculty(name), 
+                    FOREIGN KEY(class_name) REFERENCES classrooms(class_name), 
+                    FOREIGN KEY(course_code) REFERENCES courses(code))''')
+        conn.commit()
+        conn.close()
+
+    def load_data(self):
+        conn = sqlite3.connect('scheduler.db')
+        c = conn.cursor()
+        
+        # Fetch and debug classrooms
+        c.execute("SELECT class_name FROM classrooms")
+        self.classrooms = [Classroom(row[0]) for row in c.fetchall()]
+        print(f"Loaded classrooms: {[c.class_name for c in self.classrooms]}")
+        
+        # Fetch and debug courses
+        c.execute("SELECT code, name, hours FROM courses")
+        self.courses = [Course(row[1], row[0], row[2]) for row in c.fetchall()]
+        print(f"Loaded courses: {[(c.code, c.name, c.course_hours) for c in self.courses]}")
+        
+        # Fetch and debug faculty
+        c.execute("SELECT name FROM faculty")
+        self.faculties = [Faculty(row[0]) for row in c.fetchall()]
+        print(f"Loaded faculty: {[f.name for f in self.faculties]}")
+        
+        # Fetch and debug assignments
+        c.execute("SELECT faculty_name, class_name, course_code FROM assignments")
+        assignments = c.fetchall()
+        print(f"Loaded assignments: {assignments}")
+        for row in assignments:
+            faculty = next(f for f in self.faculties if f.name == row[0])
+            classroom = next(c for c in self.classrooms if c.class_name == row[1])
+            course = next(c for c in self.courses if c.code == row[2])
+            faculty.add_classes(classrooms={classroom: course})
+        
+        self.update_combos()
+        conn.close()
+
     def add_classroom(self):
         class_name = self.classroom_entry.get().strip()
         if class_name and class_name not in [c.class_name for c in self.classrooms]:
-            classroom = Classroom(class_name)
-            self.classrooms.append(classroom)
+            conn = sqlite3.connect('scheduler.db')
+            c = conn.cursor()
+            c.execute("INSERT OR IGNORE INTO classrooms (class_name) VALUES (?)", (class_name,))
+            conn.commit()
+            conn.close()
+            self.load_data()
             self.classroom_entry.delete(0, tk.END)
             self.output_text.insert(tk.END, f"Added classroom: {class_name}\n")
         else:
@@ -93,8 +149,12 @@ class SchedulerApp:
         code = self.course_code_entry.get().strip()
         hours = self.course_hours_entry.get().strip()
         if name and code and hours.isdigit() and code not in [c.code for c in self.courses]:
-            course = Course(name, code, int(hours))
-            self.courses.append(course)
+            conn = sqlite3.connect('scheduler.db')
+            c = conn.cursor()
+            c.execute("INSERT OR IGNORE INTO courses (code, name, hours) VALUES (?, ?, ?)", (code, name, int(hours)))
+            conn.commit()
+            conn.close()
+            self.load_data()
             self.course_name_entry.delete(0, tk.END)
             self.course_code_entry.delete(0, tk.END)
             self.course_hours_entry.delete(0, tk.END)
@@ -105,54 +165,57 @@ class SchedulerApp:
     def add_faculty(self):
         name = self.faculty_entry.get().strip()
         if name and name not in [f.name for f in self.faculties]:
-            faculty = Faculty(name)
-            self.faculties.append(faculty)
+            conn = sqlite3.connect('scheduler.db')
+            c = conn.cursor()
+            c.execute("INSERT OR IGNORE INTO faculty (name) VALUES (?)", (name,))
+            conn.commit()
+            conn.close()
+            self.load_data()
             self.faculty_entry.delete(0, tk.END)
             self.output_text.insert(tk.END, f"Added faculty: {name}\n")
         else:
             messagebox.showwarning("Input Error", "Please enter a unique faculty name.")
 
+    def update_combos(self):
+        self.assign_faculty_combo['values'] = [f.name for f in self.faculties]
+        self.assign_classroom_combo['values'] = [c.class_name for c in self.classrooms]
+        self.assign_course_combo['values'] = [c.code for c in self.courses]
+        print(f"Updated dropdowns - Faculty: {self.assign_faculty_combo['values']}, "
+              f"Classrooms: {self.assign_classroom_combo['values']}, "
+              f"Courses: {self.assign_course_combo['values']}")
+
     def assign_faculty(self):
-        faculty_name = self.assign_faculty_entry.get().strip()
-        class_name = self.assign_classroom_entry.get().strip()
-        course_code = self.assign_course_entry.get().strip()
+        faculty_name = self.assign_faculty_combo.get()
+        class_name = self.assign_classroom_combo.get()
+        course_code = self.assign_course_combo.get()
         if faculty_name and class_name and course_code:
-            faculty = next((f for f in self.faculties if f.name == faculty_name), None)
-            classroom = next((c for c in self.classrooms if c.class_name == class_name), None)
-            course = next((c for c in self.courses if c.code == course_code), None)
-            if not faculty:
+            conn = sqlite3.connect('scheduler.db')
+            c = conn.cursor()
+            c.execute("SELECT name FROM faculty WHERE name=?", (faculty_name,))
+            if not c.fetchone():
                 messagebox.showwarning("Input Error", "Faculty not found.")
+                conn.close()
                 return
-            if not classroom:
+            c.execute("SELECT class_name FROM classrooms WHERE class_name=?", (class_name,))
+            if not c.fetchone():
                 messagebox.showwarning("Input Error", "Classroom not found.")
+                conn.close()
                 return
-            if not course:
+            c.execute("SELECT code FROM courses WHERE code=?", (course_code,))
+            if not c.fetchone():
                 messagebox.showwarning("Input Error", "Course not found.")
+                conn.close()
                 return
-            faculty.add_classes(classrooms={classroom: course})
-            self.assign_faculty_entry.delete(0, tk.END)
-            self.assign_classroom_entry.delete(0, tk.END)
-            self.assign_course_entry.delete(0, tk.END)
+            c.execute("INSERT INTO assignments (faculty_name, class_name, course_code) VALUES (?, ?, ?)", 
+                      (faculty_name, class_name, course_code))
+            conn.commit()
+            conn.close()
+            self.load_data()
             self.output_text.insert(tk.END, f"Assigned {faculty_name} to {class_name} for {course_code}\n")
         else:
-            messagebox.showwarning("Input Error", "Please enter all assignment details.")
+            messagebox.showwarning("Input Error", "Please select all assignment details.")
 
-    def is_valid_slot_for_faculty(self, faculty, class_slot):
-        course_hours = faculty.assigned_classes[class_slot.classroom][1] > 0
-        faculty_not_going_other_class = faculty.name not in [key.faculty.name for key in self.G.neighbors(class_slot)]
-        prev_faculty = self.class_slots[class_slot.classroom][class_slot.timeslot - 2].faculty if class_slot.timeslot > 1 else None
-        last_class_different_faculty = prev_faculty.name != faculty.name if prev_faculty else True
-        count = sum(1 for slot in self.class_slots[class_slot.classroom] if slot.faculty == faculty)
-        return course_hours and faculty_not_going_other_class and last_class_different_faculty and count <= 2
-
-    def is_hours_remaining(self):
-        for faculty in self.faculties:
-            for classroom in faculty.assigned_classes.keys():
-                if faculty.assigned_classes[classroom][1] > 0:
-                    return True
-        return False
-
-    def generate_schedule(self):
+    def generate_timetable(self):
         if not self.classrooms or not self.faculties:
             messagebox.showwarning("Data Error", "Add classrooms and faculty first!")
             return
@@ -161,33 +224,10 @@ class SchedulerApp:
         self.class_slots = {room: [ClassSlots(room, ind) for ind in range(1, 8)] for room in self.classrooms}
         for classroom in self.class_slots.keys():
             self.G.add_nodes_from(self.class_slots[classroom])
-
-        day = 1
-        self.timetable_data = []
-        while self.is_hours_remaining():
-            for class_slot in self.G.nodes():
-                for faculty in class_slot.classroom.assigned_faculty.keys():
-                    if self.is_valid_slot_for_faculty(faculty, class_slot):
-                        class_slot.allocate(faculty)
-                        faculty.assigned_classes[class_slot.classroom][1] -= 1
-                        for classroom in faculty.assigned_classes.keys():
-                            if classroom.class_name != class_slot.classroom.class_name:
-                                self.G.add_edge(class_slot, self.class_slots[classroom][class_slot.timeslot-1])
-                        break
-            
-            # Collect timetable data for this day
-            day_schedule = [f"Day {day}"]
-            for classroom in self.class_slots.keys():
-                slots = [slot.faculty.name if slot.faculty else 'free' for slot in self.class_slots[classroom]]
-                day_schedule.append(f"{classroom.class_name}: {', '.join(slots)}")
-            self.timetable_data.append(day_schedule)
-            
-            # Reset for next day
-            self.G = nx.Graph()
-            self.class_slots = {room: [ClassSlots(room, ind) for ind in range(1, 8)] for room in self.classrooms}
-            for classroom in self.class_slots.keys():
-                self.G.add_nodes_from(self.class_slots[classroom])
-            day += 1
+        
+        self.faculty_schedule = {faculty: {classroom: [] for classroom in faculty.assigned_classes.keys()} for faculty in self.faculties}
+        
+        self.timetable_data = generate_timetable(self.G, self.class_slots, self.faculties, self.faculty_schedule)
         
         self.output_text.delete(1.0, tk.END)
         self.output_text.insert(tk.END, "=== Timetable ===\n")
@@ -198,7 +238,7 @@ class SchedulerApp:
 
     def save_pdf(self):
         if not self.timetable_data:
-            messagebox.showwarning("No Data", "Please generate the schedule first!")
+            messagebox.showwarning("No Data", "Please generate the timetable first!")
             return
         pdf_file = "timetable.pdf"
         doc = SimpleDocTemplate(pdf_file, pagesize=letter)
@@ -217,7 +257,7 @@ class SchedulerApp:
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
             ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
@@ -226,29 +266,24 @@ class SchedulerApp:
         doc.build(elements)
         self.output_text.insert(tk.END, f"Timetable saved as {pdf_file}\n")
 
-    def show_graph(self):
-        pos = nx.spring_layout(self.G, seed=20, k=1.5)
-        nx.draw(
-            self.G,
-            pos,
-            with_labels=True,
-            node_size=4000,
-            edge_color="grey",
-            font_size=12,
-            font_color="#ffffff",
-            width=2,
-        )
-        plt.show()
-
-    def clear_data(self):
+    def clear_database(self):
+        conn = sqlite3.connect('scheduler.db')
+        c = conn.cursor()
+        c.execute("DELETE FROM assignments")
+        c.execute("DELETE FROM faculty")
+        c.execute("DELETE FROM courses")
+        c.execute("DELETE FROM classrooms")
+        conn.commit()
+        conn.close()
         self.classrooms = []
         self.courses = []
         self.faculties = []
         self.class_slots = {}
-        self.G = nx.Graph()
+        self.faculty_schedule = {}
         self.timetable_data = []
+        self.update_combos()
         self.output_text.delete(1.0, tk.END)
-        self.output_text.insert(tk.END, "Data cleared successfully.\n")
+        self.output_text.insert(tk.END, "Database cleared successfully.\n")
 
 if __name__ == "__main__":
     root = tk.Tk()
