@@ -24,7 +24,7 @@ def is_valid_slot_for_faculty(faculty, class_slot, day, faculty_schedule, G):
     faculty_not_going_other_class = faculty.name not in [key.faculty.name for key in G.neighbors(class_slot)]
     count_today = faculty_schedule[faculty][class_slot.classroom].count(day)
     had_two_classes_before = any(faculty_schedule[faculty][class_slot.classroom].count(i) > 1 for i in range(1, day))
-    if count_today == 2:
+    if count_today == 3:
         return False  # Already assigned two classes today
     if count_today == 1 and had_two_classes_before:
         return False  # Had two classes on a previous day
