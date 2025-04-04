@@ -270,7 +270,9 @@ class SchedulerApp:
         
         col_widths = [50, 135, 135, 50, 135, 135, 50, 135, 135, 135]  # Narrower Break Columns
 
-        for class_index, class_name in enumerate(["CSEA", "CSEB", "CSEC"]):
+        classroom_names = [classroom.class_name for classroom in self.classrooms]
+
+        for class_index, class_name in enumerate(classroom_names):
             # Add class title
             elements.append(Table([[class_name]], colWidths=[sum(col_widths)], style=[
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
