@@ -39,6 +39,36 @@ def is_hours_remaining(faculties):
                 return True
     return False
 
+def save_graph(graph, day):
+    """
+    Saves the current graph `G` as a PNG image.
+
+    Args:
+        graph (nx.Graph): The NetworkX graph to visualize.
+        day (int): The current day, used in filename.
+    """
+    plt.figure(figsize=(8, 6))
+    pos = nx.spring_layout(graph, seed=1, k = 1)  # Layout for consistent positioning
+
+    # Draw nodes
+    nx.draw_networkx_nodes(graph, pos, node_size=500, node_color="skyblue")
+
+    # Draw edges with styling
+    nx.draw_networkx_edges(graph, pos, edge_color="gray", width=2.5)
+
+    # Draw labels: class name + timeslot
+    node_labels = {
+        node: f"{node.classroom.class_name}\nT{node.timeslot}"
+        for node in graph.nodes
+    }
+    nx.draw_networkx_labels(graph, pos, labels=node_labels, font_size=8)
+
+    plt.title(f"Graph - Day {day}")
+    plt.axis('off')
+    plt.tight_layout()
+    plt.savefig(f"graph_day_{day}.png", dpi=150)
+    plt.close()
+
 def generate_timetable(G, class_slots, faculties, faculty_schedule):
     """
     Generates a timetable based on the provided data structures.
@@ -75,6 +105,7 @@ def generate_timetable(G, class_slots, faculties, faculty_schedule):
         timetable.append(day_schedule)
 
         # Reset for next day
+        save_graph(G, day)
         G.clear()  # Clear the graph instead of reinitializing to preserve object reference
         for classroom in class_slots.keys():
             class_slots[classroom] = [ClassSlots(classroom, ind) for ind in range(1, 8)]

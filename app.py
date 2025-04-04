@@ -105,7 +105,7 @@ class SchedulerApp:
         ttk.Button(self.button_frame, text="Clear Database", command=self.clear_database).grid(row=1, column=0, padx=5, pady=5)
 
         # Output Text
-        self.output_text = tk.Text(self.output_frame, height=20, width=90, font=("Candara", 14), bg="#F0F4F8", fg="#333333")
+        self.output_text = tk.Text(self.output_frame, height=20, width=90, font=("Candara", 14), bg="#0000aa", fg="#ffffff")
         self.output_text.grid(row=0, column=0, sticky="nsew")
         self.output_frame.grid_rowconfigure(0, weight=1)
         self.output_frame.grid_columnconfigure(0, weight=1)
@@ -133,22 +133,18 @@ class SchedulerApp:
         # Fetch and debug classrooms
         c.execute("SELECT class_name FROM classrooms")
         self.classrooms = [Classroom(row[0]) for row in c.fetchall()]
-        print(f"Loaded classrooms: {[c.class_name for c in self.classrooms]}")
         
         # Fetch and debug courses
         c.execute("SELECT code, name, hours FROM courses")
         self.courses = [Course(row[1], row[0], row[2]) for row in c.fetchall()]
-        print(f"Loaded courses: {[(c.code, c.name, c.course_hours) for c in self.courses]}")
         
         # Fetch and debug faculty
         c.execute("SELECT name FROM faculty")
         self.faculties = [Faculty(row[0]) for row in c.fetchall()]
-        print(f"Loaded faculty: {[f.name for f in self.faculties]}")
         
         # Fetch and debug assignments
         c.execute("SELECT faculty_name, class_name, course_code FROM assignments")
         assignments = c.fetchall()
-        print(f"Loaded assignments: {assignments}")
         for row in assignments:
             faculty = next(f for f in self.faculties if f.name == row[0])
             classroom = next(c for c in self.classrooms if c.class_name == row[1])
@@ -208,9 +204,6 @@ class SchedulerApp:
         self.assign_faculty_combo['values'] = [f.name for f in self.faculties]
         self.assign_classroom_combo['values'] = [c.class_name for c in self.classrooms]
         self.assign_course_combo['values'] = [c.code for c in self.courses]
-        print(f"Updated dropdowns - Faculty: {self.assign_faculty_combo['values']}, "
-              f"Classrooms: {self.assign_classroom_combo['values']}, "
-              f"Courses: {self.assign_course_combo['values']}")
 
     def assign_faculty(self):
         faculty_name = self.assign_faculty_combo.get()
